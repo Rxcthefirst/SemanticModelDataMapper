@@ -240,29 +240,75 @@ class MappingGenerator:
         col_analysis: ColumnAnalysis,
         properties: List[OntologyProperty],
     ) -> Optional[OntologyProperty]:
-        """Match a column to an ontology property."""
+        """
+        Match a column to an ontology property using multiple strategies.
+        
+        Matching priority:
+        1. Exact match with SKOS prefLabel
+        2. Exact match with rdfs:label
+        3. Exact match with SKOS altLabel
+        4. Exact match with SKOS hiddenLabel
+        5. Exact match with local name
+        6. Partial match with any label
+        7. Fuzzy match with local name
+        """
         col_lower = col_name.lower().replace("_", "").replace(" ", "")
         
-        # Try exact label match
+        # Priority 1: Exact match with SKOS prefLabel
+        for prop in properties:
+            if prop.pref_label:
+                pref_label_clean = prop.pref_label.lower().replace("_", "").replace(" ", "")
+                if col_lower == pref_label_clean:
+                    return prop
+        
+        # Priority 2: Exact match with rdfs:label
         for prop in properties:
             if prop.label:
                 prop_label_clean = prop.label.lower().replace("_", "").replace(" ", "")
                 if col_lower == prop_label_clean:
                     return prop
         
-        # Try local name match
+        # Priority 3: Exact match with SKOS altLabel
+        for prop in properties:
+            for alt_label in prop.alt_labels:
+                alt_label_clean = alt_label.lower().replace("_", "").replace(" ", "")
+                if col_lower == alt_label_clean:
+                    return prop
+        
+        # Priority 4: Exact match with SKOS hiddenLabel
+        for prop in properties:
+            for hidden_label in prop.hidden_labels:
+                hidden_label_clean = hidden_label.lower().replace("_", "").replace(" ", "")
+                if col_lower == hidden_label_clean:
+                    return prop
+        
+        # Priority 5: Exact match with local name
         for prop in properties:
             local_name = str(prop.uri).split("#")[-1].split("/")[-1]
             local_clean = local_name.lower().replace("_", "")
             if col_lower == local_clean:
                 return prop
         
-        # Try partial match
+        # Priority 6: Partial match with any label (pref, rdfs, alt)
         for prop in properties:
+            all_labels = []
+            if prop.pref_label:
+                all_labels.append(prop.pref_label)
             if prop.label:
-                prop_label_clean = prop.label.lower().replace("_", "").replace(" ", "")
-                if col_lower in prop_label_clean or prop_label_clean in col_lower:
+                all_labels.append(prop.label)
+            all_labels.extend(prop.alt_labels)
+            
+            for label in all_labels:
+                label_clean = label.lower().replace("_", "").replace(" ", "")
+                if col_lower in label_clean or label_clean in col_lower:
                     return prop
+        
+        # Priority 7: Fuzzy match with local name
+        for prop in properties:
+            local_name = str(prop.uri).split("#")[-1].split("/")[-1]
+            local_clean = local_name.lower().replace("_", "")
+            if col_lower in local_clean or local_clean in col_lower:
+                return prop
         
         return None
     

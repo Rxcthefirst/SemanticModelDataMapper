@@ -1,0 +1,11 @@
+EMP_ID,fname,lname,email_addr,phone,sal,hire_dt,active,dept_cd,title,manager_id
+E001,John,Smith,john.smith@company.com,555-0101,75000,2020-01-15,Yes,ENG,Senior Developer,E005
+E002,Jane,Doe,jane.doe@company.com,555-0102,85000,2019-03-22,Yes,HR,HR Manager,
+E003,Bob,Johnson,bob.johnson@company.com,555-0103,95000,2018-07-10,Yes,ENG,Engineering Manager,
+E004,Alice,Williams,alice.williams@company.com,555-0104,65000,2021-05-18,Yes,SALES,Sales Representative,E007
+E005,Charlie,Brown,charlie.brown@company.com,555-0105,120000,2017-02-01,Yes,ENG,Director of Engineering,
+E006,Diana,Miller,diana.miller@company.com,555-0106,55000,2022-09-12,No,HR,HR Coordinator,E002
+E007,Eve,Davis,eve.davis@company.com,555-0107,110000,2018-11-30,Yes,SALES,VP of Sales,
+E008,Frank,Garcia,frank.garcia@company.com,555-0108,72000,2020-06-25,Yes,ENG,Software Engineer,E003
+E009,Grace,Martinez,grace.martinez@company.com,555-0109,68000,2021-08-14,Yes,SALES,Account Executive,E007
+E010,Henry,Rodriguez,henry.rodriguez@company.com,555-0110,58000,2022-01-20,Yes,HR,Recruiter,E002

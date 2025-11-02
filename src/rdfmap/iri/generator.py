@@ -105,11 +105,12 @@ def validate_iri(iri: str) -> bool:
     Returns:
         True if valid IRI
     """
-    # Basic IRI validation - must have scheme and authority
+    # Basic IRI validation - must have scheme and something after it
+    # Supports both hierarchical (http://, ftp://) and non-hierarchical (urn:, mailto:) schemes
     iri_pattern = re.compile(
         r"^[a-zA-Z][a-zA-Z0-9+.-]*:"  # Scheme
-        r"//?"  # Authority separator (optional second slash)
-        r"[^\s]+"  # Path/fragment
+        r"(//)?"  # Optional authority separator for hierarchical IRIs
+        r"[^\s]+"  # Path/fragment/scheme-specific part
     )
     return bool(iri_pattern.match(iri))
 

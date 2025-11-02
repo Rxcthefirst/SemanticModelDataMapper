@@ -4,15 +4,40 @@ from typing import Dict, List, Set, Tuple, Optional
 from rdflib import Graph, Namespace, RDF, RDFS, OWL
 from rdflib.term import URIRef
 
+# SKOS namespace
+SKOS = Namespace("http://www.w3.org/2004/02/skos/core#")
+
 
 class OntologyClass:
     """Represents a class from the ontology."""
     
-    def __init__(self, uri: URIRef, label: Optional[str] = None, comment: Optional[str] = None):
+    def __init__(
+        self, 
+        uri: URIRef, 
+        label: Optional[str] = None, 
+        comment: Optional[str] = None,
+        pref_label: Optional[str] = None,
+        alt_labels: Optional[List[str]] = None,
+        hidden_labels: Optional[List[str]] = None
+    ):
         self.uri = uri
         self.label = label
         self.comment = comment
+        self.pref_label = pref_label  # SKOS preferred label
+        self.alt_labels = alt_labels or []  # SKOS alternative labels
+        self.hidden_labels = hidden_labels or []  # SKOS hidden labels
         self.properties: List['OntologyProperty'] = []
+    
+    def get_all_labels(self) -> List[str]:
+        """Get all labels (preferred, rdfs, alternative) for matching."""
+        labels = []
+        if self.pref_label:
+            labels.append(self.pref_label)
+        if self.label:
+            labels.append(self.label)
+        labels.extend(self.alt_labels)
+        # Note: hidden labels are not included in general matching
+        return labels
     
     def __repr__(self):
         return f"OntologyClass({self.uri}, label={self.label})"
@@ -29,6 +54,9 @@ class OntologyProperty:
         domain: Optional[URIRef] = None,
         range_type: Optional[URIRef] = None,
         is_object_property: bool = False,
+        pref_label: Optional[str] = None,
+        alt_labels: Optional[List[str]] = None,
+        hidden_labels: Optional[List[str]] = None
     ):
         self.uri = uri
         self.label = label
@@ -36,6 +64,20 @@ class OntologyProperty:
         self.domain = domain
         self.range_type = range_type
         self.is_object_property = is_object_property
+        self.pref_label = pref_label  # SKOS preferred label
+        self.alt_labels = alt_labels or []  # SKOS alternative labels
+        self.hidden_labels = hidden_labels or []  # SKOS hidden labels
+    
+    def get_all_labels(self) -> List[str]:
+        """Get all labels (preferred, rdfs, alternative, hidden) for matching."""
+        labels = []
+        if self.pref_label:
+            labels.append(self.pref_label)
+        if self.label:
+            labels.append(self.label)
+        labels.extend(self.alt_labels)
+        labels.extend(self.hidden_labels)  # Include hidden labels for column matching
+        return labels
     
     def __repr__(self):
         return f"OntologyProperty({self.uri}, domain={self.domain}, range={self.range_type})"
@@ -70,14 +112,24 @@ class OntologyAnalyzer:
         for cls_uri in self.graph.subjects(RDF.type, OWL.Class):
             label = self._get_label(cls_uri)
             comment = self._get_comment(cls_uri)
-            self.classes[cls_uri] = OntologyClass(cls_uri, label, comment)
+            pref_label = self._get_pref_label(cls_uri)
+            alt_labels = self._get_alt_labels(cls_uri)
+            hidden_labels = self._get_hidden_labels(cls_uri)
+            self.classes[cls_uri] = OntologyClass(
+                cls_uri, label, comment, pref_label, alt_labels, hidden_labels
+            )
         
         # Also check for RDFS classes
         for cls_uri in self.graph.subjects(RDF.type, RDFS.Class):
             if cls_uri not in self.classes:
                 label = self._get_label(cls_uri)
                 comment = self._get_comment(cls_uri)
-                self.classes[cls_uri] = OntologyClass(cls_uri, label, comment)
+                pref_label = self._get_pref_label(cls_uri)
+                alt_labels = self._get_alt_labels(cls_uri)
+                hidden_labels = self._get_hidden_labels(cls_uri)
+                self.classes[cls_uri] = OntologyClass(
+                    cls_uri, label, comment, pref_label, alt_labels, hidden_labels
+                )
     
     def _extract_properties(self):
         """Extract all properties (data and object) from the ontology."""
@@ -98,6 +150,9 @@ class OntologyAnalyzer:
         """Extract property details."""
         label = self._get_label(prop_uri)
         comment = self._get_comment(prop_uri)
+        pref_label = self._get_pref_label(prop_uri)
+        alt_labels = self._get_alt_labels(prop_uri)
+        hidden_labels = self._get_hidden_labels(prop_uri)
         
         # Get domain
         domain = None
@@ -118,6 +173,9 @@ class OntologyAnalyzer:
             domain,
             range_type,
             is_object_property,
+            pref_label,
+            alt_labels,
+            hidden_labels,
         )
     
     def _link_properties_to_classes(self):
@@ -137,6 +195,20 @@ class OntologyAnalyzer:
         for comment in self.graph.objects(uri, RDFS.comment):
             return str(comment)
         return None
+    
+    def _get_pref_label(self, uri: URIRef) -> Optional[str]:
+        """Get SKOS preferred label for a URI."""
+        for label in self.graph.objects(uri, SKOS.prefLabel):
+            return str(label)
+        return None
+    
+    def _get_alt_labels(self, uri: URIRef) -> List[str]:
+        """Get all SKOS alternative labels for a URI."""
+        return [str(label) for label in self.graph.objects(uri, SKOS.altLabel)]
+    
+    def _get_hidden_labels(self, uri: URIRef) -> List[str]:
+        """Get all SKOS hidden labels for a URI."""
+        return [str(label) for label in self.graph.objects(uri, SKOS.hiddenLabel)]
     
     def get_class_by_uri(self, uri: URIRef) -> Optional[OntologyClass]:
         """Get a class by its URI."""

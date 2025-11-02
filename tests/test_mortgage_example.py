@@ -197,9 +197,11 @@ class TestMortgageExample:
         turtle_output = serialize_graph(graph, "turtle")
         assert "@prefix ex:" in turtle_output or "@prefix" in turtle_output
         
-        # Test JSON-LD
+        # Test JSON-LD (may be in expanded form without @context/@graph wrapper)
         jsonld_output = serialize_graph(graph, "json-ld")
-        assert "@context" in jsonld_output or "@graph" in jsonld_output
+        # Valid JSON-LD can be: 1) object with @context, 2) array of objects (expanded form), 3) object with @graph
+        assert ("@context" in jsonld_output or "@graph" in jsonld_output or 
+                (jsonld_output.strip().startswith("[") and "@id" in jsonld_output))
         
         # Test N-Triples
         nt_output = serialize_graph(graph, "nt")

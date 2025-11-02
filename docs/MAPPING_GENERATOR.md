@@ -11,6 +11,7 @@ The **Mapping Generator** feature automates the creation of mapping configuratio
 - Supports any RDFLib-compatible format (TTL, RDF/XML, JSON-LD, etc.)
 - Identifies datatype properties vs. object properties
 - Captures labels, comments, domains, and ranges
+- **🆕 Extracts SKOS labels** (prefLabel, altLabel, hiddenLabel) for advanced matching
 - Extracts namespace declarations
 
 ### 2. **Spreadsheet Analysis**
@@ -20,9 +21,13 @@ The **Mapping Generator** feature automates the creation of mapping configuratio
 - Suggests appropriate XSD datatypes
 - Identifies unique columns
 
-### 3. **Intelligent Matching**
+### 3. **Intelligent Matching with SKOS Support**
 - Maps columns to ontology properties by name similarity
-- Considers labels and URIs for matching
+- **🆕 Leverages SKOS labels for flexible matching:**
+  - Handles abbreviations (e.g., `EMP_ID` → `employeeId` via hiddenLabel)
+  - Matches synonyms (e.g., `Surname` → `lastName` via altLabel)
+  - Supports business terminology variations
+- Priority-based matching (prefLabel > rdfs:label > altLabel > hiddenLabel > local name)
 - Suggests IRI templates based on identifier columns
 - Auto-detects linked objects and relationships
 
@@ -142,6 +147,135 @@ generator.save_yaml("mapping.yaml")
 - Uses identifier columns detected in spreadsheet
 - Falls back to first column if no identifiers found
 - Formats as: `{class_name}:{column}`
+
+---
+
+## SKOS Label Matching
+
+### Overview
+
+The generator leverages **SKOS (Simple Knowledge Organization System)** labels to handle real-world scenarios where column names don't match ontology property labels exactly. This is essential for:
+
+- **Abbreviations**: `EMP_ID` → `employeeId`
+- **Synonyms**: `Surname` → `lastName`  
+- **Business terminology**: `Compensation` → `salary`
+- **Database conventions**: `hire_dt` → `hireDate`
+
+### SKOS Vocabulary Support
+
+The generator extracts and uses these SKOS properties:
+
+| SKOS Property | Purpose | Example |
+|---------------|---------|---------|
+| `skos:prefLabel` | Preferred display label | "Employee ID" |
+| `skos:altLabel` | Alternative/synonym labels | "EmpID", "Staff Number" |
+| `skos:hiddenLabel` | Hidden labels for matching | "EMP_ID", "emp_no", "staff_id" |
+
+### Matching Priority
+
+The generator follows a **priority order** when matching column names to properties:
+
+1. **Exact match with SKOS prefLabel** - Highest priority
+2. **Exact match with rdfs:label** - Standard RDF label
+3. **Exact match with SKOS altLabel** - Alternative names
+4. **Exact match with SKOS hiddenLabel** - Common abbreviations
+5. **Exact match with local name** - Last part of URI
+6. **Partial match with any label** - Fuzzy matching
+7. **Fuzzy match with local name** - Most permissive
+
+### Example Ontology with SKOS Labels
+
+```turtle
+@prefix : <http://example.org/hr#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+:employeeId a owl:DatatypeProperty ;
+    rdfs:label "employee identifier" ;
+    skos:prefLabel "Employee ID" ;
+    skos:altLabel "EmpID" ;
+    skos:altLabel "Staff Number" ;
+    skos:hiddenLabel "EMP_ID" ;      # Database column name
+    skos:hiddenLabel "emp_no" ;      # Legacy system
+    skos:hiddenLabel "staff_id" ;    # Alternative DB column
+    rdfs:domain :Employee ;
+    rdfs:range xsd:string .
+
+:firstName a owl:DatatypeProperty ;
+    rdfs:label "first name" ;
+    skos:prefLabel "First Name" ;
+    skos:altLabel "Given Name" ;
+    skos:altLabel "Forename" ;
+    skos:hiddenLabel "fname" ;       # Common abbreviation
+    skos:hiddenLabel "first_nm" ;    # Database convention
+    rdfs:domain :Employee ;
+    rdfs:range xsd:string .
+
+:salary a owl:DatatypeProperty ;
+    rdfs:label "annual salary" ;
+    skos:prefLabel "Annual Salary" ;
+    skos:altLabel "Compensation" ;   # Business term
+    skos:altLabel "Pay" ;            # Informal term
+    skos:hiddenLabel "sal" ;         # Database column
+    skos:hiddenLabel "annual_pay" ;
+    rdfs:domain :Employee ;
+    rdfs:range xsd:decimal .
+```
+
+### Example CSV with Challenging Column Names
+
+```csv
+EMP_ID,fname,lname,email_addr,phone,sal,hire_dt,active,dept_cd
+E001,John,Smith,john@company.com,555-0101,75000,2020-01-15,Yes,ENG
+E002,Jane,Doe,jane@company.com,555-0102,85000,2019-03-22,Yes,HR
+```
+
+### How Matching Works
+
+| CSV Column | Matches Property | Via | Reasoning |
+|------------|------------------|-----|-----------|
+| `EMP_ID` | `:employeeId` | hiddenLabel | Exact match with hidden label |
+| `fname` | `:firstName` | hiddenLabel | Common abbreviation |
+| `lname` | `:lastName` | hiddenLabel | Common abbreviation |
+| `email_addr` | `:emailAddress` | hiddenLabel | Database convention |
+| `sal` | `:salary` | hiddenLabel | Business abbreviation |
+| `hire_dt` | `:hireDate` | hiddenLabel | Date column convention |
+
+### Benefits
+
+✅ **Handles legacy systems** - Column names from old databases  
+✅ **Supports abbreviations** - Common shorthand notation  
+✅ **Business terminology** - Domain-specific synonyms  
+✅ **No ontology changes required** - Add labels, keep URIs stable  
+✅ **Better than fuzzy matching** - Explicit, controlled vocabulary  
+✅ **Documentation built-in** - SKOS labels serve as docs
+
+### When to Use SKOS Labels
+
+**Use SKOS labels when:**
+- Column names use abbreviations (e.g., `dept_cd`, `emp_no`)
+- Legacy database column names don't match modern ontology
+- Multiple synonyms exist in business domain
+- Cross-organization data exchange (different naming conventions)
+- International projects (translations via `skos:prefLabel` with language tags)
+
+**Best Practices:**
+1. Use `skos:prefLabel` for the canonical display name
+2. Use `skos:altLabel` for business synonyms and variations
+3. Use `skos:hiddenLabel` for technical abbreviations and legacy names
+4. Keep `rdfs:label` for the formal semantic definition
+5. Document rationale in `rdfs:comment`
+
+### Testing SKOS Matching
+
+See `tests/test_generator_workflow.py` for comprehensive test cases covering:
+- SKOS label extraction from ontologies
+- Priority-based matching
+- Hidden label matching (abbreviations)
+- Alternative label matching (synonyms)
+- Full workflow with challenging column names
 
 ---
 
