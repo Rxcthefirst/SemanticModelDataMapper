@@ -1,0 +1,28 @@
+emp_num,fname,lname,middle_init,email_addr,phone,job_ttl,dept_code,mgr_id,hire_dt,status_cd,office_loc,annual_comp,cost_ctr
+E001,Alice,Johnson,M,alice.johnson@company.com,555-0101,Senior Software Engineer,IT,M001,2018-03-15,Active,Building A,125000,CC-IT-001
+E002,Bob,Smith,,bob.smith@company.com,555-0102,Product Manager,PROD,M002,2019-07-22,Active,Building B,110000,CC-PROD-001
+E003,Carol,Williams,J,carol.williams@company.com,555-0103,Data Analyst,IT,M001,2020-01-10,Active,Building A,85000,CC-IT-001
+E004,David,Brown,,david.brown@company.com,555-0104,HR Specialist,HR,M003,2017-11-05,Active,Building C,75000,CC-HR-001
+E005,Eve,Davis,K,eve.davis@company.com,555-0105,Software Engineer,IT,M001,2021-05-18,Active,Building A,95000,CC-IT-001
+E006,Frank,Miller,,frank.miller@company.com,555-0106,Sales Representative,SALES,M004,2019-09-12,Active,Building D,80000,CC-SALES-001
+E007,Grace,Wilson,L,grace.wilson@company.com,555-0107,Financial Analyst,FIN,M005,2020-03-25,Active,Building C,90000,CC-FIN-001
+E008,Henry,Moore,,henry.moore@company.com,555-0108,DevOps Engineer,IT,M001,2018-12-01,Active,Building A,105000,CC-IT-001
+E009,Iris,Taylor,M,iris.taylor@company.com,555-0109,Marketing Coordinator,MKTG,M006,2021-02-14,Active,Building B,70000,CC-MKTG-001
+E010,Jack,Anderson,,jack.anderson@company.com,555-0110,Senior Data Scientist,IT,M001,2017-06-30,Active,Building A,135000,CC-IT-001
+E011,Karen,Thomas,R,karen.thomas@company.com,555-0111,HR Manager,HR,M003,2016-04-18,Active,Building C,95000,CC-HR-001
+E012,Leo,Jackson,,leo.jackson@company.com,555-0112,Junior Developer,IT,M001,2022-01-09,Active,Building A,75000,CC-IT-001
+E013,Maria,White,S,maria.white@company.com,555-0113,Operations Manager,OPS,M007,2018-08-20,Active,Building E,100000,CC-OPS-001
+E014,Nathan,Harris,,nathan.harris@company.com,555-0114,Sales Manager,SALES,M004,2017-02-11,Active,Building D,115000,CC-SALES-001
+E015,Olivia,Martin,T,olivia.martin@company.com,555-0115,Content Writer,MKTG,M006,2020-11-03,Active,Building B,65000,CC-MKTG-001
+E016,Paul,Thompson,,paul.thompson@company.com,555-0116,Business Analyst,PROD,M002,2019-04-16,Active,Building B,88000,CC-PROD-001
+E017,Quinn,Garcia,U,quinn.garcia@company.com,555-0117,QA Engineer,IT,M001,2021-08-22,Active,Building A,82000,CC-IT-001
+E018,Rachel,Martinez,,rachel.martinez@company.com,555-0118,Finance Manager,FIN,M005,2016-09-07,Active,Building C,105000,CC-FIN-001
+E019,Sam,Robinson,V,sam.robinson@company.com,555-0119,IT Support Specialist,IT,M001,2022-03-14,Active,Building A,68000,CC-IT-001
+E020,Tina,Clark,W,tina.clark@company.com,555-0120,Senior Product Manager,PROD,M002,2017-10-25,Active,Building B,125000,CC-PROD-001
+M001,Alice,Johnson,M,alice.johnson@company.com,555-0101,Engineering Director,IT,,2015-01-15,Active,Building A,155000,CC-IT-001
+M002,Bob,Rodriguez,,bob.rodriguez@company.com,555-0201,Product Director,PROD,,2014-06-20,Active,Building B,145000,CC-PROD-001
+M003,Carol,Martinez,P,carol.martinez@company.com,555-0202,HR Director,HR,,2013-11-10,Active,Building C,130000,CC-HR-001
+M004,David,Lee,,david.lee@company.com,555-0203,Sales Director,SALES,,2015-08-05,Active,Building D,140000,CC-SALES-001
+M005,Emma,Walker,Q,emma.walker@company.com,555-0204,Finance Director,FIN,,2014-03-18,Active,Building C,145000,CC-FIN-001
+M006,Frank,Hall,,frank.hall@company.com,555-0205,Marketing Director,MKTG,,2016-02-22,Active,Building B,135000,CC-MKTG-001
+M007,Grace,Allen,R,grace.allen@company.com,555-0206,Operations Director,OPS,,2015-07-14,Active,Building E,140000,CC-OPS-001

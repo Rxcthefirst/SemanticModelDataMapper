@@ -347,12 +347,17 @@ class TestMatchingPriority:
         # Get column analysis
         col_analysis = generator.spreadsheet.get_analysis("fname")
         
-        # Test matching
-        matched = generator._match_column_to_property("fname", col_analysis, properties)
+        # Test matching (returns tuple: property, match_type, matched_via)
+        match_result = generator._match_column_to_property("fname", col_analysis, properties)
         
         # Should match firstName property via hiddenLabel
-        assert matched is not None
-        assert "firstName" in str(matched.uri)
+        assert match_result is not None
+        matched_prop, match_type, matched_via = match_result
+        assert "firstName" in str(matched_prop.uri)
+        
+        # Verify it matched via hiddenLabel
+        from rdfmap.models.alignment import MatchType
+        assert match_type == MatchType.EXACT_HIDDEN_LABEL
 
 
 class TestDataTypeInference:

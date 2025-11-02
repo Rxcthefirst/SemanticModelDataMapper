@@ -25,12 +25,6 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
 ]
-
-[project.urls]
-Homepage = "https://github.com/your-username/SemanticModelDataMapper"
-Documentation = "https://github.com/your-username/SemanticModelDataMapper#readme"
-Repository = "https://github.com/your-username/SemanticModelDataMapper"
-Issues = "https://github.com/your-username/SemanticModelDataMapper/issues"
 dependencies = [
     "rdflib>=7.0.0",
     "pandas>=2.1.0",
@@ -44,6 +38,12 @@ dependencies = [
     "rich>=13.7.0",
     "click>=8.1.7",
 ]
+
+[project.urls]
+Homepage = "https://github.com/your-username/SemanticModelDataMapper"
+Documentation = "https://github.com/your-username/SemanticModelDataMapper#readme"
+Repository = "https://github.com/your-username/SemanticModelDataMapper"
+Issues = "https://github.com/your-username/SemanticModelDataMapper/issues"
 
 [project.optional-dependencies]
 dev = [
