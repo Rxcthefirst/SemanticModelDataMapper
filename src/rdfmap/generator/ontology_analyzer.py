@@ -56,7 +56,13 @@ class OntologyProperty:
         is_object_property: bool = False,
         pref_label: Optional[str] = None,
         alt_labels: Optional[List[str]] = None,
-        hidden_labels: Optional[List[str]] = None
+        hidden_labels: Optional[List[str]] = None,
+        broader: Optional[List[str]] = None,
+        narrower: Optional[List[str]] = None,
+        related: Optional[List[str]] = None,
+        exact_matches: Optional[List[str]] = None,
+        close_matches: Optional[List[str]] = None,
+        definition: Optional[str] = None
     ):
         self.uri = uri
         self.label = label
@@ -67,7 +73,13 @@ class OntologyProperty:
         self.pref_label = pref_label  # SKOS preferred label
         self.alt_labels = alt_labels or []  # SKOS alternative labels
         self.hidden_labels = hidden_labels or []  # SKOS hidden labels
-    
+        self.broader = broader or []
+        self.narrower = narrower or []
+        self.related = related or []
+        self.exact_matches = exact_matches or []
+        self.close_matches = close_matches or []
+        self.definition = definition
+
     def get_all_labels(self) -> List[str]:
         """Get all labels (preferred, rdfs, alternative, hidden) for matching."""
         labels = []
@@ -77,6 +89,8 @@ class OntologyProperty:
             labels.append(self.label)
         labels.extend(self.alt_labels)
         labels.extend(self.hidden_labels)  # Include hidden labels for column matching
+        if self.definition:
+            labels.append(self.definition)
         return labels
     
     def __repr__(self):
@@ -111,7 +125,8 @@ class OntologyAnalyzer:
 
         self.classes: Dict[URIRef, OntologyClass] = {}
         self.properties: Dict[URIRef, OntologyProperty] = {}
-        
+        self.property_restrictions: Dict[str, List[Dict[str, any]]] = {}
+
         self._analyze()
     
     def _analyze(self):
@@ -119,7 +134,8 @@ class OntologyAnalyzer:
         self._extract_classes()
         self._extract_properties()
         self._link_properties_to_classes()
-    
+        self._extract_owl_restrictions()
+
     def _extract_classes(self):
         """Extract all OWL/RDFS classes from the ontology."""
         for cls_uri in self.graph.subjects(RDF.type, OWL.Class):
@@ -179,6 +195,14 @@ class OntologyAnalyzer:
             range_type = r
             break  # Take first range
         
+        broader = [str(b) for b in self.graph.objects(prop_uri, SKOS.broader)]
+        narrower = [str(n) for n in self.graph.objects(prop_uri, SKOS.narrower)]
+        related = [str(r) for r in self.graph.objects(prop_uri, SKOS.related)]
+        exact_matches = [str(e) for e in self.graph.objects(prop_uri, SKOS.exactMatch)]
+        close_matches = [str(c) for c in self.graph.objects(prop_uri, SKOS.closeMatch)]
+        definition_vals = [str(d) for d in self.graph.objects(prop_uri, SKOS.definition)]
+        definition = definition_vals[0] if definition_vals else None
+
         self.properties[prop_uri] = OntologyProperty(
             prop_uri,
             label,
@@ -189,6 +213,12 @@ class OntologyAnalyzer:
             pref_label,
             alt_labels,
             hidden_labels,
+            broader,
+            narrower,
+            related,
+            exact_matches,
+            close_matches,
+            definition,
         )
     
     def _link_properties_to_classes(self):
@@ -283,3 +313,45 @@ class OntologyAnalyzer:
             if prefix:  # Skip default namespace
                 namespaces[prefix] = str(namespace)
         return namespaces
+
+    def _extract_owl_restrictions(self):
+        """Parse OWL restrictions (onProperty, some/allValuesFrom, cardinality) and store them per property."""
+        from rdflib import RDF, OWL
+        for cls_uri in self.classes.keys():
+            for restriction in self.graph.objects(cls_uri, RDFS.subClassOf):
+                # Accept both BNodes and URIRefs typed as OWL.Restriction
+                if (restriction, RDF.type, OWL.Restriction) in self.graph:
+                    prop = None
+                    range_target = None
+                    all_values = None
+                    some_values = None
+                    cardinality = None
+                    min_card = None
+                    max_card = None
+                    for p in self.graph.objects(restriction, OWL.onProperty):
+                        prop = str(p)
+                    for v in self.graph.objects(restriction, OWL.someValuesFrom):
+                        some_values = str(v)
+                    for v in self.graph.objects(restriction, OWL.allValuesFrom):
+                        all_values = str(v)
+                    for v in self.graph.objects(restriction, OWL.hasValue):
+                        range_target = str(v)
+                    for v in self.graph.objects(restriction, OWL.cardinality):
+                        try: cardinality = int(str(v))
+                        except: cardinality = None
+                    for v in self.graph.objects(restriction, OWL.minCardinality):
+                        try: min_card = int(str(v))
+                        except: min_card = None
+                    for v in self.graph.objects(restriction, OWL.maxCardinality):
+                        try: max_card = int(str(v))
+                        except: max_card = None
+                    if prop:
+                        self.property_restrictions.setdefault(prop, []).append({
+                            'class': str(cls_uri),
+                            'someValuesFrom': some_values,
+                            'allValuesFrom': all_values,
+                            'hasValue': range_target,
+                            'cardinality': cardinality,
+                            'minCardinality': min_card,
+                            'maxCardinality': max_card
+                        })

@@ -8,7 +8,8 @@ intelligent matching decisions based on:
 - Semantic distance and relevance
 """
 
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Set, Tuple
+from collections import defaultdict
 from .base import (
     ColumnPropertyMatcher,
     MatchResult,
@@ -425,4 +426,340 @@ class InheritanceAwareMatcher(ColumnPropertyMatcher):
                 return 0.8
 
         return 0.0
+
+
+class GraphContextMatcher(ColumnPropertyMatcher):
+    """Enhanced matcher using property co-occurrence patterns and context.
+
+    This matcher implements advanced context-aware matching by:
+    1. Learning property co-occurrence patterns from the ontology
+    2. Boosting confidence when related properties are already matched
+    3. Using structural similarity across columns
+    4. Propagating context through the matching process
+
+    Example: If firstName and lastName are already matched, boost confidence
+    for middleName, birthDate, and other person-related properties.
+    """
+
+    def __init__(
+        self,
+        reasoner: GraphReasoner,
+        enabled: bool = True,
+        threshold: float = 0.5,
+        use_cooccurrence: bool = True,
+        cooccurrence_boost: float = 0.15,
+        use_probabilistic_reasoning: bool = True,
+        propagation_decay: float = 0.8,
+        max_evidence_sources: int = 5
+    ):
+        """Initialize graph context matcher.
+
+        Args:
+            reasoner: GraphReasoner instance for ontology analysis
+            enabled: Whether this matcher is active
+            threshold: Minimum confidence for matches
+            use_cooccurrence: Whether to use co-occurrence patterns
+            cooccurrence_boost: Maximum boost from co-occurrence (default 0.15)
+            use_probabilistic_reasoning: Enable Bayesian-style confidence propagation
+            propagation_decay: Decay factor for multi-hop evidence (0.8 = 20% decay per hop)
+            max_evidence_sources: Maximum evidence sources to accumulate
+        """
+        super().__init__(enabled, threshold)
+        self.reasoner = reasoner
+        self.use_cooccurrence = use_cooccurrence
+        self.cooccurrence_boost = cooccurrence_boost
+        self.use_probabilistic_reasoning = use_probabilistic_reasoning
+        self.propagation_decay = propagation_decay
+        self.max_evidence_sources = max_evidence_sources
+
+        # Build co-occurrence cache
+        self.cooccurrence_patterns: Dict[str, Set[str]] = {}
+        self.cooccurrence_probabilities: Dict[str, Dict[str, float]] = {}
+        self.property_similarities: Dict[str, List[Tuple[str, float]]] = {}
+
+        if use_cooccurrence:
+            self._build_cooccurrence_cache()
+
+        if use_probabilistic_reasoning:
+            self._build_probabilistic_knowledge_base()
+
+    def name(self) -> str:
+        return "GraphContextMatcher"
+
+    def priority(self) -> MatchPriority:
+        return MatchPriority.HIGH  # High priority because context is authoritative
+
+    def _build_cooccurrence_cache(self):
+        """Build cache of properties that tend to co-occur.
+
+        Properties co-occur when they:
+        1. Share the same domain (e.g., all Person properties)
+        2. Have related ranges (e.g., address components)
+        3. Form semantic clusters (e.g., name properties, contact info)
+        """
+        # Get all properties from reasoner
+        try:
+            all_properties = list(self.reasoner.properties.values())
+
+            # Group by domain
+            domain_groups: Dict[str, List[OntologyProperty]] = defaultdict(list)
+            for prop in all_properties:
+                if prop.domain:
+                    domain_groups[str(prop.domain)].append(prop)
+
+            # Build co-occurrence sets as strings for consistency with tests
+            for _domain, props in domain_groups.items():
+                for prop in props:
+                    cooccurring: Set[str] = set()
+                    for other_prop in props:
+                        if other_prop.uri != prop.uri:
+                            cooccurring.add(str(other_prop.uri))
+                    self.cooccurrence_patterns[str(prop.uri)] = cooccurring
+        except Exception as e:
+            import warnings
+            warnings.warn(f"Failed to build co-occurrence cache: {e}")
+
+    def match(
+        self,
+        column: DataFieldAnalysis,
+        properties: List[OntologyProperty],
+        context: Optional[MatchContext] = None
+    ) -> Optional[MatchResult]:
+        """Match column using context and co-occurrence patterns."""
+        if not self.enabled:
+            return None
+
+        best_match = None
+        best_score = 0.0
+        base_score = 0.0
+        context_boost = 0.0
+
+        for prop in properties:
+            # Base score from label similarity
+            prop_base_score = self._score_label_similarity(column, prop)
+
+            if prop_base_score < 0.3:  # Skip if label match is too weak
+                continue
+
+            # Apply context-based boosting
+            prop_context_boost = 0.0
+            if context and self.use_cooccurrence:
+                prop_context_boost = self._calculate_cooccurrence_score(prop, context)
+
+            # Final score
+            final_score = min(prop_base_score + prop_context_boost, 1.0)
+
+            if final_score > best_score and final_score >= self.threshold:
+                best_score = final_score
+                best_match = prop
+                base_score = prop_base_score
+                context_boost = prop_context_boost
+
+        if best_match:
+            # Determine match via string
+            if context and context.matched_properties and context_boost > 0:
+                matched_via = f"context_boosted(base={base_score:.3f}, boost={context_boost:.3f})"
+            else:
+                matched_via = f"label_match(score={best_score:.3f})"
+
+            return MatchResult(
+                property=best_match,
+                match_type=MatchType.GRAPH_REASONING,
+                confidence=best_score,
+                matched_via=matched_via,
+                matcher_name=self.name()
+            )
+
+        return None
+
+    def _calculate_cooccurrence_score(
+        self,
+        prop: OntologyProperty,
+        context: MatchContext
+    ) -> float:
+        """Calculate confidence boost based on co-occurring properties.
+
+        Args:
+            prop: Property being evaluated
+            context: Matching context with already matched properties
+
+        Returns:
+            Boost value (0.0 to cooccurrence_boost)
+        """
+        if not context.matched_properties:
+            return 0.0
+
+        cooccurring = self.cooccurrence_patterns.get(str(prop.uri), set())
+        if not cooccurring:
+            return 0.0
+
+        matched_cooccurring = 0
+        for matched_prop_uri in context.matched_properties.values():
+            if matched_prop_uri in cooccurring:
+                matched_cooccurring += 1
+        if matched_cooccurring == 0:
+            return 0.0
+        boost_ratio = min(matched_cooccurring / 3.0, 1.0)
+        return boost_ratio * self.cooccurrence_boost
+
+    def _score_label_similarity(
+        self,
+        column: DataFieldAnalysis,
+        prop: OntologyProperty
+    ) -> float:
+        # Enhanced label similarity with common abbreviations
+        col_name_lower = column.name.lower().replace('_', ' ').replace('-', ' ')
+
+        # Abbreviation and synonym expansions
+        expansions = {
+            'fname': 'first name',
+            'first name': 'first name',
+            'lname': 'last name',
+            'last name': 'last name',
+            'mname': 'middle name',
+            'middle initial': 'middle name',
+            'dob': 'birth date',
+            'birth date': 'birth date',
+            'birth city': 'birth place',
+            'birth place': 'birth place',
+            'email address': 'email',
+            'phone': 'phone number',
+            'phone number': 'phone number',
+            'postal code': 'zip code',
+            'zipcode': 'zip code',
+            'zip': 'zip code',
+            'city name': 'city',
+            'address': 'street address',
+        }
+
+        expanded_terms = set()
+        for key, val in expansions.items():
+            if key in col_name_lower:
+                expanded_terms.add(val)
+
+        all_labels = prop.get_all_labels()
+        max_similarity = 0.0
+        for label in all_labels:
+            label_lower = label.lower().replace('_', ' ').replace('-', ' ')
+
+            # Direct abbreviation/synonym match boost
+            if label_lower in expanded_terms:
+                max_similarity = max(max_similarity, 0.85)
+                continue
+
+            # Exact match
+            if col_name_lower == label_lower:
+                max_similarity = max(max_similarity, 1.0)
+                continue
+
+            # Substring match
+            if col_name_lower in label_lower or label_lower in col_name_lower:
+                max_similarity = max(max_similarity, 0.8)
+                continue
+
+            # Word overlap
+            col_words = set(col_name_lower.split())
+            label_words = set(label_lower.split())
+            if col_words and label_words:
+                overlap = len(col_words & label_words)
+                total = len(col_words | label_words)
+                if total > 0:
+                    word_score = overlap / total
+                    max_similarity = max(max_similarity, word_score * 0.7)
+
+        return max_similarity
+
+    def _build_probabilistic_knowledge_base(self):
+        """Build probabilistic knowledge base for Bayesian reasoning."""
+        try:
+            # Build co-occurrence probabilities (not just binary relationships)
+            all_properties = list(self.reasoner.properties.values())
+
+            # Group by domain for probability calculations
+            domain_groups = defaultdict(list)
+            for prop in all_properties:
+                if prop.domain:
+                    domain_groups[str(prop.domain)].append(prop)
+
+            # Calculate conditional probabilities P(prop2|prop1)
+            for domain, props in domain_groups.items():
+                if len(props) < 2:
+                    continue
+
+                total_props = len(props)
+                for prop1 in props:
+                    prop1_uri = str(prop1.uri)
+                    self.cooccurrence_probabilities[prop1_uri] = {}
+
+                    for prop2 in props:
+                        if prop1.uri != prop2.uri:
+                            prop2_uri = str(prop2.uri)
+
+                            # Base probability: 1/(n-1) for uniform distribution
+                            base_prob = 1.0 / (total_props - 1)
+
+                            # Boost based on semantic similarity
+                            semantic_similarity = self._calculate_semantic_similarity(prop1, prop2)
+
+                            # Final conditional probability
+                            prob = min(base_prob * (1 + semantic_similarity), 0.95)
+                            self.cooccurrence_probabilities[prop1_uri][prop2_uri] = prob
+
+            # Build property similarity graph for multi-hop reasoning
+            self._build_property_similarity_graph(all_properties)
+
+        except Exception as e:
+            import warnings
+            warnings.warn(f"Failed to build probabilistic knowledge base: {e}")
+
+    def _calculate_semantic_similarity(self, prop1: OntologyProperty, prop2: OntologyProperty) -> float:
+        """Calculate semantic similarity between two properties for probabilistic reasoning."""
+        similarity = 0.0
+
+        # Label similarity (word overlap)
+        labels1 = []
+        labels2 = []
+
+        for label in prop1.get_all_labels():
+            labels1.extend(label.lower().split())
+        for label in prop2.get_all_labels():
+            labels2.extend(label.lower().split())
+
+        if labels1 and labels2:
+            words1 = set(labels1)
+            words2 = set(labels2)
+            if words1 and words2:
+                overlap = len(words1 & words2)
+                total = len(words1 | words2)
+                similarity += (overlap / total) * 0.5
+
+        # Range similarity
+        if prop1.range_type == prop2.range_type and prop1.range_type:
+            similarity += 0.3
+
+        # SKOS relationship similarity
+        if hasattr(prop1, 'related') and hasattr(prop2, 'related'):
+            prop1_relations = set(prop1.related + prop1.broader + prop1.narrower)
+            prop2_relations = set(prop2.related + prop2.broader + prop2.narrower)
+
+            if str(prop2.uri) in prop1_relations or str(prop1.uri) in prop2_relations:
+                similarity += 0.4
+
+        return min(similarity, 1.0)
+
+    def _build_property_similarity_graph(self, properties: List[OntologyProperty]):
+        """Build graph of property similarities for multi-hop reasoning."""
+        for prop1 in properties:
+            similarities = []
+            prop1_uri = str(prop1.uri)
+
+            for prop2 in properties:
+                if prop1.uri != prop2.uri:
+                    sim = self._calculate_semantic_similarity(prop1, prop2)
+                    if sim > 0.1:  # Only store significant similarities
+                        similarities.append((str(prop2.uri), sim))
+
+            # Sort by similarity and keep top 10
+            similarities.sort(key=lambda x: x[1], reverse=True)
+            self.property_similarities[prop1_uri] = similarities[:10]
 

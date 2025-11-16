@@ -1,0 +1,96 @@
+services:
+  # Backend API
+  api:
+    build: ./backend
+    container_name: rdfmap-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://rdfmap:rdfmap@db:5432/rdfmap
+      - REDIS_URL=redis://redis:6379/0
+      - CORS_ORIGINS=http://localhost:8080,http://localhost:5173
+      - SECRET_KEY=change-me-in-production
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+      - ./backend:/app
+      - ./src/rdfmap:/usr/local/lib/python3.11/site-packages/rdfmap
+    depends_on:
+      - db
+      - redis
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - rdfmap-network
+
+  # Frontend UI
+  ui:
+    build:
+      context: ./frontend
+      target: development
+    container_name: rdfmap-ui
+    ports:
+      - "8080:80"
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - api
+    networks:
+      - rdfmap-network
+
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    container_name: rdfmap-db
+    environment:
+      - POSTGRES_DB=rdfmap
+      - POSTGRES_USER=rdfmap
+      - POSTGRES_PASSWORD=rdfmap
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - rdfmap-network
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: rdfmap-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - rdfmap-network
+
+  # Celery Worker
+  worker:
+    build: ./backend
+    container_name: rdfmap-worker
+    command: celery -A app.worker:celery_app worker --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://rdfmap:rdfmap@db:5432/rdfmap
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+      - ./backend:/app
+    networks:
+      - rdfmap-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  rdfmap-network:
+    driver: bridge
+

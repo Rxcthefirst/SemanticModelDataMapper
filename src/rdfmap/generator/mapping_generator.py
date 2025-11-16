@@ -419,12 +419,13 @@ class MappingGenerator:
         
         # Build template with {base_iri} placeholder
         id_part = "/".join([f"{{{col}}}" for col in id_cols])
-        return f"{{{{base_iri}}}}{class_name}/{id_part}"
+        return f"{{base_iri}}{class_name}/{id_part}"
 
     def _generate_column_mappings(self, target_class: OntologyClass) -> Dict[str, Any]:
         """Generate column to property mappings."""
         mappings = {}
-        
+        used_properties = set()
+
         # Get datatype properties for this class
         properties = self.ontology.get_datatype_properties(target_class.uri)
         
@@ -890,11 +891,20 @@ class MappingGenerator:
 
                     properties.append(prop_mapping)
 
+                # Post-process properties list to remove duplicates of same target property
+                unique_props = []
+                seen_prop_targets = set()
+                for p in properties:
+                    tgt = p.get('as')
+                    if tgt in seen_prop_targets:
+                        continue
+                    seen_prop_targets.add(tgt)
+                    unique_props.append(p)
                 object_mappings[obj_name] = {
-                    "predicate": self._format_uri(prop.uri),
-                    "class": self._format_uri(range_class.uri),
-                    "iri_template": self._generate_iri_template(range_class, for_object=True, object_class=range_class),
-                    "properties": properties,
+                    'predicate': self._format_uri(prop.uri),
+                    'class': self._format_uri(range_class.uri),
+                    'iri_template': self._generate_iri_template(range_class, for_object=True, object_class=range_class),
+                    'properties': unique_props,
                 }
         
         return object_mappings

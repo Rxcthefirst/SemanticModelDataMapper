@@ -17,6 +17,8 @@ from .fuzzy_matchers import PartialStringMatcher, FuzzyStringMatcher
 from .graph_matcher import GraphReasoningMatcher, InheritanceAwareMatcher
 from .hierarchy_matcher import PropertyHierarchyMatcher
 from .owl_characteristics_matcher import OWLCharacteristicsMatcher
+from .restriction_matcher import RestrictionBasedMatcher
+from .skos_relations_matcher import SKOSRelationsMatcher
 
 
 def create_default_pipeline(
@@ -27,6 +29,8 @@ def create_default_pipeline(
     use_graph_reasoning: bool = True,
     use_hierarchy: bool = True,
     use_owl_characteristics: bool = True,
+    use_restrictions: bool = True,
+    use_skos_relations: bool = True,
     semantic_threshold: float = 0.6,
     datatype_threshold: float = 0.7,
     history_threshold: float = 0.6,
@@ -34,11 +38,18 @@ def create_default_pipeline(
     graph_reasoning_threshold: float = 0.6,
     hierarchy_threshold: float = 0.65,
     owl_characteristics_threshold: float = 0.60,
+    restrictions_threshold: float = 0.55,
+    skos_relations_threshold: float = 0.50,
     semantic_model: str = "sentence-transformers/all-MiniLM-L6-v2",
     enable_logging: bool = False,
     enable_calibration: bool = True,
     reasoner: Optional[any] = None,  # GraphReasoner instance
-    ontology_analyzer: Optional[any] = None  # OntologyAnalyzer instance
+    ontology_analyzer: Optional[any] = None,  # OntologyAnalyzer instance
+    # Advanced experimental flags (temporarily disabled until implemented)
+    use_probabilistic_reasoning: bool = False,
+    probabilistic_threshold: float = 0.6,
+    use_ontology_validation: bool = False,
+    validation_threshold: float = 0.6,
 ) -> MatcherPipeline:
     """Create the default matcher pipeline.
 
@@ -49,7 +60,9 @@ def create_default_pipeline(
         use_structural: Enable structural/relationship matching
         use_graph_reasoning: Enable ontology graph reasoning
         use_hierarchy: Enable property hierarchy reasoning
-        use_owl_characteristics: Enable OWL characteristics reasoning (NEW!)
+        use_owl_characteristics: Enable OWL characteristics reasoning
+        use_restrictions: Enable OWL restriction-based matching (Phase 2)
+        use_skos_relations: Enable SKOS relations matching (Phase 2)
         semantic_threshold: Threshold for semantic matches (0-1)
         datatype_threshold: Threshold for datatype matches (0-1)
         history_threshold: Threshold for history matches (0-1)
@@ -57,6 +70,8 @@ def create_default_pipeline(
         graph_reasoning_threshold: Threshold for graph reasoning matches (0-1)
         hierarchy_threshold: Threshold for hierarchy matches (0-1)
         owl_characteristics_threshold: Threshold for OWL characteristics matches (0-1)
+        restrictions_threshold: Threshold for OWL restriction matches (0-1)
+        skos_relations_threshold: Threshold for SKOS relations matches (0-1)
         semantic_model: Sentence transformer model name
         enable_logging: Enable detailed matching logger
         enable_calibration: Enable confidence calibration
@@ -99,6 +114,52 @@ def create_default_pipeline(
                 fp_uniqueness_threshold=0.95
             )
         )
+
+    # Phase 2 matchers: Restriction-based and SKOS relations
+    if use_restrictions and ontology_analyzer is not None:
+        matchers.append(
+            RestrictionBasedMatcher(
+                ontology_analyzer=ontology_analyzer,
+                enabled=True,
+                threshold=restrictions_threshold
+            )
+        )
+
+    if use_skos_relations:
+        matchers.append(
+            SKOSRelationsMatcher(
+                enabled=True,
+                threshold=skos_relations_threshold
+            )
+        )
+
+    # Phase 3 matchers: Probabilistic reasoning and validation (currently disabled unless flags set)
+    if use_probabilistic_reasoning and ontology_analyzer is not None and reasoner is not None:
+        try:
+            from .probabilistic_matcher import ProbabilisticGraphMatcher  # optional module
+            matchers.append(
+                ProbabilisticGraphMatcher(
+                    ontology_analyzer=ontology_analyzer,
+                    graph_reasoner=reasoner,
+                    enabled=True,
+                    threshold=probabilistic_threshold
+                )
+            )
+        except ImportError:
+            pass  # Silently skip if module not available
+
+    if use_ontology_validation and ontology_analyzer is not None:
+        try:
+            from .validation_matcher import OntologyValidationMatcher  # optional module
+            matchers.append(
+                OntologyValidationMatcher(
+                    ontology_analyzer=ontology_analyzer,
+                    enabled=True,
+                    threshold=validation_threshold
+                )
+            )
+        except ImportError:
+            pass
 
     # Continue with other matchers
     matchers.extend([
@@ -213,4 +274,3 @@ def create_custom_pipeline(
         calibrator = ConfidenceCalibrator()
 
     return MatcherPipeline(matchers, logger=logger, calibrator=calibrator)
-

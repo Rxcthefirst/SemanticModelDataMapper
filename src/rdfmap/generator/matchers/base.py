@@ -5,7 +5,7 @@ where different matching strategies can be composed and prioritized.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict
 from dataclasses import dataclass
 from enum import IntEnum
 
@@ -43,6 +43,7 @@ class MatchContext:
     all_columns: List[DataFieldAnalysis]
     available_properties: List[OntologyProperty]
     domain_hints: Optional[str] = None  # "finance", "healthcare", etc.
+    matched_properties: Optional[Dict[str, str]] = None  # column_name -> property_uri mapping
 
 
 class ColumnPropertyMatcher(ABC):

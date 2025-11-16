@@ -21,6 +21,7 @@ from .structural_matcher import StructuralMatcher
 from .fuzzy_matchers import PartialStringMatcher, FuzzyStringMatcher
 from .hierarchy_matcher import PropertyHierarchyMatcher
 from .owl_characteristics_matcher import OWLCharacteristicsMatcher
+from .graph_matcher import GraphReasoningMatcher, InheritanceAwareMatcher, GraphContextMatcher
 from .factory import (
     create_default_pipeline,
     create_exact_only_pipeline,
@@ -28,6 +29,8 @@ from .factory import (
     create_semantic_only_pipeline,
     create_custom_pipeline
 )
+from .restriction_matcher import RestrictionBasedMatcher
+from .skos_relations_matcher import SKOSRelationsMatcher
 
 __all__ = [
     # Base classes
@@ -48,12 +51,16 @@ __all__ = [
     'SemanticSimilarityMatcher',
     'HistoryAwareMatcher',
     'StructuralMatcher',
-    'HistoryAwareMatcher',
     'DataTypeInferenceMatcher',
     'PartialStringMatcher',
     'FuzzyStringMatcher',
     'PropertyHierarchyMatcher',
     'OWLCharacteristicsMatcher',
+    'GraphReasoningMatcher',
+    'InheritanceAwareMatcher',
+    'GraphContextMatcher',
+    'RestrictionBasedMatcher',
+    'SKOSRelationsMatcher',
 
     # Factory functions
     'create_default_pipeline',
